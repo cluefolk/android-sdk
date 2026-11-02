@@ -18,7 +18,7 @@ The SDK is on Maven Central, which new Android projects already list in their re
 
 ```kotlin
 dependencies {
-    implementation("com.cluefolk:android-sdk:0.3.0")
+    implementation("com.cluefolk:android-sdk:0.3.1")
 }
 ```
 
