@@ -1,0 +1,10 @@
+{
+  "protocol": "cluefolk",
+  "version": 2,
+  "requestId": "00000000-0000-4000-8000-000000000001",
+  "type": "native.conversationStatusChanged",
+  "payload": {
+    "conversationId": "7b1c7c3e-1f9a-4a0e-9f4b-1d2e3f4a5b6c",
+    "status": "resolved"
+  }
+}

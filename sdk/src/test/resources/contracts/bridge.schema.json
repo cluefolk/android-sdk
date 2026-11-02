@@ -1,0 +1,561 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluefolk.com/contracts/bridge/v2",
+  "title": "Cluefolk bridge protocol 2",
+  "description": "Envelope between the support widget (WebView) and the native SDK. native.* are widget requests; sdk.* are native replies. Canonical copy: server/contracts. Clients receive copies via server/scripts/sync-contracts.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "version",
+    "requestId",
+    "type",
+    "payload"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "cluefolk"
+    },
+    "version": {
+      "const": 2
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "type": {
+      "enum": [
+        "native.ready",
+        "native.authRequired",
+        "native.close",
+        "native.unreadCountChanged",
+        "native.historyPage",
+        "native.conversationCreated",
+        "native.conversationStatusChanged",
+        "native.messageSent",
+        "native.draftGet",
+        "native.draftPut",
+        "native.imagePut",
+        "native.imageGet",
+        "sdk.bootstrap",
+        "sdk.ack",
+        "sdk.error"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.authRequired"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.close"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.unreadCountChanged"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "count"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.historyPage"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "syncId",
+              "index"
+            ],
+            "properties": {
+              "syncId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.conversationCreated"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "conversationId"
+            ],
+            "properties": {
+              "conversationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.conversationStatusChanged"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "conversationId",
+              "status"
+            ],
+            "properties": {
+              "conversationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "status": {
+                "enum": [
+                  "open",
+                  "pending_agent",
+                  "pending_player",
+                  "resolved",
+                  "closed"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.messageSent"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "conversationId",
+              "messageId"
+            ],
+            "properties": {
+              "conversationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "messageId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.draftGet"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.draftPut"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "content"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "content": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "Private native draft; AES-GCM/Keystore on Android, Keychain on iOS. Never browser storage. Bound to the current account by native code."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.imagePut"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "data"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "description": "The attachment ID the server returned for the upload."
+              },
+              "data": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9+/]+=*$",
+                "maxLength": 120000,
+                "description": "The player's own copy of an image they sent: a JPEG preview the widget made from the picked file, at most 90,000 bytes (base64), so it fits one bridge message. The server never returns images to players; native code keeps this copy (AES-GCM, Keystore on Android, Keychain key on iOS), bound to the current account, outside browser storage."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "native.imageGet"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "sdk.bootstrap"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "apiBaseUrl",
+              "context",
+              "player"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 32
+              },
+              "apiBaseUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "context": {
+                "type": "object"
+              },
+              "appearance": {
+                "anyOf": [
+                  {
+                    "$ref": "appearance.schema.json"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "logo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^data:image/png;base64,[A-Za-z0-9+/]+=*$",
+                    "maxLength": 400000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The game's icon, read by the SDK from the app (app icon or a named resource)."
+              },
+              "language": {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+              },
+              "navigation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "screen",
+                  "id"
+                ],
+                "properties": {
+                  "screen": {
+                    "enum": [
+                      "home",
+                      "conversation"
+                    ]
+                  },
+                  "id": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                }
+              },
+              "unreadCount": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "eventCursor": {
+                "type": "string",
+                "pattern": "^[0-9]{1,20}:[0-9]{1,19}$"
+              },
+              "historySyncId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "historyPageCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "player": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "externalUserId",
+                  "claimedExternalId"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "anonymous",
+                      "verified"
+                    ]
+                  },
+                  "externalUserId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 256
+                  },
+                  "claimedExternalId": {
+                    "type": "string",
+                    "maxLength": 256
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "sdk.ack"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "sdk.error"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

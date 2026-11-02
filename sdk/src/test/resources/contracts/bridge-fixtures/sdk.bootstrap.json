@@ -1,0 +1,33 @@
+{
+  "protocol": "cluefolk",
+  "version": 2,
+  "requestId": "00000000-0000-4000-8000-000000000001",
+  "type": "sdk.bootstrap",
+  "payload": {
+    "code": "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+    "apiBaseUrl": "https://cluefolk.com",
+    "context": {
+      "screen": "inventory",
+      "_cluefolk": {
+        "platform": "android",
+        "sdkVersion": "0.2.0"
+      }
+    },
+    "appearance": null,
+    "logo": null,
+    "language": "en-US",
+    "navigation": {
+      "screen": "conversation",
+      "id": ""
+    },
+    "unreadCount": 0,
+    "eventCursor": "12345:0",
+    "historySyncId": "b8f6",
+    "historyPageCount": 1,
+    "player": {
+      "kind": "anonymous",
+      "externalUserId": null,
+      "claimedExternalId": ""
+    }
+  }
+}

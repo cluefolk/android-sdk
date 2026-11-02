@@ -1,0 +1,6 @@
+-keep public class com.cluefolk.sdk.Cluefolk { public *; }
+-keep public class com.cluefolk.sdk.Cluefolk$* { public *; }
+-keep public class com.cluefolk.sdk.SupportActivity { public *; }
+-keep public class com.cluefolk.sdk.UnityBridge { public *; }
+-keep public class com.cluefolk.sdk.Appearance { public *; }
+-keep public class com.cluefolk.sdk.Appearance$* { public *; }

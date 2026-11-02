@@ -1,0 +1,18 @@
+{
+  "protocol": "cluefolk",
+  "version": 2,
+  "requestId": "00000000-0000-4000-8000-000000000001",
+  "type": "native.draftPut",
+  "payload": {
+    "key": "new",
+    "content": {
+      "body": "Hello",
+      "attachments": [],
+      "clientId": "c3f9",
+      "version": 0,
+      "visibility": "public",
+      "mentions": [],
+      "dirty": true
+    }
+  }
+}
