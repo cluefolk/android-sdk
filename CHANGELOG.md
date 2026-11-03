@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 — 2026-11-03
+
+- Validate appearance values and embedded images before parsing or WebView decoding; reject excessive dimensions and pixel counts.
+- Enforce bridge payload types and bound identity provider requests to 15 seconds.
+- Keep attachment previews bounded while preserving JPEG orientation and WebView compatibility.
+- Lock dependencies and verify plugin, dependency and metadata SHA-256 checksums in strict mode.
+
 ## 0.3.1 — 2026-11-02
 
 Support screen updates.

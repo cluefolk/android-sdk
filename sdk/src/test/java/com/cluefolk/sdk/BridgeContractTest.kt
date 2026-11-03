@@ -88,6 +88,25 @@ class BridgeContractTest {
     }
 
     @Test
+    fun malformedNativePayloadsAreRejectedWithTheirCorrelationIdAvailable() {
+        fun rejected(type: String, payload: JSONObject) {
+            val envelope = JSONObject(fixtures.getValue(type).toString()).put("payload", payload)
+            assertEquals(envelope.getString("requestId"), BridgeMessages.requestId(envelope.toString()))
+            assertThrows(type, IllegalArgumentException::class.java) { BridgeMessages.parse(envelope.toString()) }
+        }
+        rejected(BridgeProtocol.NATIVE_READY, JSONObject().put("extra", true))
+        rejected(BridgeProtocol.NATIVE_UNREAD_COUNT_CHANGED, JSONObject().put("count", -1))
+        rejected(BridgeProtocol.NATIVE_UNREAD_COUNT_CHANGED, JSONObject().put("count", "1"))
+        rejected(BridgeProtocol.NATIVE_HISTORY_PAGE, JSONObject().put("syncId", "sync").put("index", 0).put("extra", true))
+        rejected(BridgeProtocol.NATIVE_CONVERSATION_STATUS_CHANGED,
+            JSONObject().put("conversationId", "conversation").put("status", "unknown"))
+        rejected(BridgeProtocol.NATIVE_DRAFT_PUT, JSONObject().put("key", "new").put("content", "not-an-object"))
+        rejected(BridgeProtocol.NATIVE_IMAGE_GET, JSONObject().put("id", "0b6a9c3e-7d1f-4e2a-9c58-3f0e2d1b4a77").put("extra", true))
+        assertEquals(null, BridgeMessages.requestId("not json"))
+        assertEquals(null, BridgeMessages.requestId("""{"requestId":""}"""))
+    }
+
+    @Test
     fun repliesUseTheFixtureEnvelope() {
         val fixture = fixtures.getValue(BridgeProtocol.SDK_ACK)
         val reply = JSONObject(BridgeMessages.reply("00000000-0000-4000-8000-000000000001", BridgeProtocol.SDK_ACK,

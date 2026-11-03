@@ -22,6 +22,7 @@ import android.webkit.WebViewClient
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import org.json.JSONObject
+import java.util.UUID
 
 class SupportActivity : ComponentActivity() {
     private var requestId = ""
@@ -146,16 +147,24 @@ internal class SupportView(
                 source, message, origin, mainFrame, reply ->
                 if (!Cluefolk.isCurrentSupport(requestId) || !mainFrame || source !== web ||
                     Cluefolk.origin(origin.toString()) != Cluefolk.origin(url)) return@addWebMessageListener
-                val raw = message.data ?: return@addWebMessageListener
-                if (raw.toByteArray().size > 131_072) return@addWebMessageListener
+                val raw = message.data
+                fun post(id: String, type: String, data: JSONObject = JSONObject()) {
+                    if (Cluefolk.isCurrentSupport(requestId) && !destroyed &&
+                        WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                        reply.postMessage(BridgeMessages.reply(id, type, data))
+                    }
+                }
+                if (raw == null || raw.toByteArray(Charsets.UTF_8).size > 131_072) {
+                    post(UUID.randomUUID().toString(), BridgeProtocol.SDK_ERROR, JSONObject().put("code", "INVALID_BRIDGE_MESSAGE"))
+                    Cluefolk.notifyError("INVALID_BRIDGE_MESSAGE")
+                    return@addWebMessageListener
+                }
+                val fallbackId = BridgeMessages.requestId(raw) ?: UUID.randomUUID().toString()
                 try {
                     val request = BridgeMessages.parse(raw)
                     val payload = request.payload
                     fun respond(type: String, data: JSONObject = JSONObject()) {
-                        if (Cluefolk.isCurrentSupport(requestId) && !destroyed &&
-                            WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-                            reply.postMessage(BridgeMessages.reply(request.id, type, data))
-                        }
+                        post(request.id, type, data)
                     }
                     when (request.type) {
                         !in BridgeProtocol.NATIVE_REQUESTS ->
@@ -210,6 +219,7 @@ internal class SupportView(
                         }
                     }
                 } catch (_: Exception) {
+                    post(fallbackId, BridgeProtocol.SDK_ERROR, JSONObject().put("code", "INVALID_BRIDGE_MESSAGE"))
                     if (Cluefolk.isCurrentSupport(requestId)) Cluefolk.notifyError("INVALID_BRIDGE_MESSAGE")
                 }
             }

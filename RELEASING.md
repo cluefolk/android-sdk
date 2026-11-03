@@ -10,6 +10,17 @@ For maintainers. A release publishes `com.cluefolk:android-sdk` to Maven Central
    ./gradlew :sdk:assembleRelease :sdk:lintRelease :sdk:testDebugUnitTest :sdk:publishToMavenLocal
    ```
 
+   Dependency lock state and SHA-256 verification metadata are committed. When a
+   plugin or dependency changes, regenerate both files with the full task graph,
+   review every new checksum against the publisher, and repeat the check from an
+   empty Gradle cache on Linux. Never use lenient or disabled verification:
+
+   ```sh
+   ./gradlew :sdk:dependencies --write-locks --write-verification-metadata sha256
+   ./gradlew :sdk:assembleRelease :sdk:lintRelease :sdk:testDebugUnitTest \
+     --write-locks --write-verification-metadata sha256
+   ```
+
 4. Credentials live outside the repository, in `~/.gradle/gradle.properties` or `ORG_GRADLE_PROJECT_*` environment variables:
    - `mavenCentralUsername`, `mavenCentralPassword`: a Central Portal user token for the `com.cluefolk` namespace;
    - `signing.keyId`, `signing.password`, `signing.secretKeyRingFile`, or `signingInMemoryKey` with `signingInMemoryKeyPassword`: the release signing key, whose public key is on a public key server.

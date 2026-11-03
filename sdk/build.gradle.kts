@@ -7,7 +7,7 @@ plugins {
     id("com.vanniktech.maven.publish")
 }
 group = "com.cluefolk"
-version = "0.3.1"
+version = "0.3.2"
 android {
     namespace = "com.cluefolk.sdk"
     compileSdk { version = release(37) { minorApiLevel = 0 } }

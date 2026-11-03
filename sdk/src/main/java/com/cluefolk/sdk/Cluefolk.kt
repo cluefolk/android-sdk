@@ -723,6 +723,7 @@ object Cluefolk {
 
     @JvmStatic
     fun setAttributes(values: String) {
+        boundedJSON(values, 15_000, "The attributes JSON is larger than 15 KB")
         val incoming = JSONObject(values)
         require(incoming.length() <= 64 && incoming.toString().toByteArray(Charsets.UTF_8).size <= 15_000)
         onMain {

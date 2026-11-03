@@ -38,7 +38,8 @@ class Appearance internal constructor(internal val json: String, internal val ro
         private val blocks = ArrayList<Block>()
 
         init {
-            val parsed = JsonParser("appearance JSON", json ?: AppearanceDefaults.JSON).parse()
+            val source = boundedJSON(json ?: AppearanceDefaults.JSON, MAX_LENGTH, "The appearance JSON is larger than 1.5 MB")
+            val parsed = JsonParser("appearance JSON", source).parse()
             require(parsed is JsonObject) { "The appearance JSON must be an object" }
             val root = Fields("appearance", parsed)
             val version = root.raw("version")
@@ -108,7 +109,10 @@ class Appearance internal constructor(internal val json: String, internal val ro
          * topics {title, items: [{label, category, icon}]}, contact {title, text}.
          */
         internal fun overrides(json: String): Builder = apply {
-            val parsed = JsonParser("appearance overrides JSON", json).parse()
+            val parsed = JsonParser(
+                "appearance overrides JSON",
+                boundedJSON(json, MAX_LENGTH, "The appearance overrides JSON is larger than 1.5 MB"),
+            ).parse()
             require(parsed is JsonObject) { "The appearance overrides must be an object" }
             val root = Fields("overrides", parsed)
             root.keys(emptySet(), setOf("title", "mode", "rotation", "colors", WELCOME, TOPICS, CONTACT))
@@ -187,9 +191,85 @@ private const val CONTACT = "contact"
 private val BLOCK_TYPES = listOf(WELCOME, TOPICS, CONTACT)
 private const val MAX_LENGTH = 1_500_000
 private const val IMAGE_MAX_LENGTH = 700_040
+private const val IMAGE_MAX_BYTES = 525_000
+private const val IMAGE_MAX_DIMENSION = 2_048
+private const val BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 private val HEX_COLOR = Regex("#[0-9A-Fa-f]{6}")
 private val CATEGORY_KEY = Regex("[a-z][a-z0-9_]{0,49}")
 private val IMAGE = Regex("data:image/(png|jpeg);base64,[A-Za-z0-9+/]+=*")
+
+/** Rejects oversized JSON text before a parser can allocate its object graph. */
+internal fun boundedJSON(value: String, limit: Int, message: String): String {
+    require(value.length <= limit && value.toByteArray(Charsets.UTF_8).size <= limit) { message }
+    return value
+}
+
+// android.util.Base64 is unavailable in plain JVM tests and java.util.Base64
+// needs API 26. Decode the already bounded standard alphabet without either.
+private fun decodeBase64(value: String): ByteArray? {
+    if (value.isEmpty() || value.length % 4 == 1) return null
+    val padding = value.length - value.trimEnd('=').length
+    if (padding > 2 || padding > 0 && value.length % 4 != 0) return null
+    val content = value.length - padding
+    if (padding == 1 && content % 4 != 3 || padding == 2 && content % 4 != 2) return null
+    val output = ByteArray(content * 6 / 8)
+    var buffer = 0
+    var bits = 0
+    var index = 0
+    for (offset in 0 until content) {
+        val digit = BASE64_ALPHABET.indexOf(value[offset])
+        if (digit < 0) return null
+        buffer = buffer shl 6 or digit
+        bits += 6
+        if (bits >= 8) {
+            bits -= 8
+            output[index++] = (buffer shr bits).toByte()
+            buffer = if (bits == 0) 0 else buffer and ((1 shl bits) - 1)
+        }
+    }
+    if (buffer != 0 || index != output.size) return null
+    return output
+}
+
+private fun validEmbeddedImage(value: String): Boolean {
+    if (value.length > IMAGE_MAX_LENGTH || !IMAGE.matches(value)) return false
+    val comma = value.indexOf(',')
+    val bytes = decodeBase64(value.substring(comma + 1)) ?: return false
+    if (bytes.isEmpty() || bytes.size > IMAGE_MAX_BYTES) return false
+    fun byte(offset: Int) = if (offset in bytes.indices) bytes[offset].toInt() and 0xff else -1
+    fun uint16(offset: Int) = byte(offset) * 256 + byte(offset + 1)
+    fun uint32(offset: Int): Long =
+        (byte(offset).toLong() shl 24) or (byte(offset + 1).toLong() shl 16) or
+            (byte(offset + 2).toLong() shl 8) or byte(offset + 3).toLong()
+    var width = 0L
+    var height = 0L
+    if (value.startsWith("data:image/png;base64,") && bytes.size >= 24 &&
+        byte(0) == 0x89 && bytes.copyOfRange(1, 8).contentEquals("PNG\r\n\u001a\n".toByteArray()) &&
+        uint32(8) == 13L && bytes.copyOfRange(12, 16).contentEquals("IHDR".toByteArray())) {
+        width = uint32(16)
+        height = uint32(20)
+    } else if (value.startsWith("data:image/jpeg;base64,") && byte(0) == 0xff && byte(1) == 0xd8) {
+        var offset = 2
+        while (offset + 1 < bytes.size) {
+            if (byte(offset++) != 0xff) break
+            while (byte(offset) == 0xff) offset++
+            val marker = byte(offset++)
+            if (marker == 0xda || marker == 0xd9 || marker < 0) break
+            if (marker == 0x01 || marker in 0xd0..0xd7) continue
+            if (offset + 2 > bytes.size) break
+            val length = uint16(offset)
+            if (length < 2 || offset + length > bytes.size) break
+            if (marker in 0xc0..0xcf && marker !in listOf(0xc4, 0xc8, 0xcc) && length >= 8) {
+                height = uint16(offset + 3).toLong()
+                width = uint16(offset + 5).toLong()
+                break
+            }
+            offset += length
+        }
+    }
+    return width in 1..IMAGE_MAX_DIMENSION.toLong() && height in 1..IMAGE_MAX_DIMENSION.toLong() &&
+        width * height <= IMAGE_MAX_DIMENSION.toLong() * IMAGE_MAX_DIMENSION
+}
 
 private class Palette(val accent: String, val action: String, val background: String, val surface: String, val text: String) {
     private val values get() = listOf("accent" to accent, "action" to action, "background" to background, "surface" to surface, "text" to text)
@@ -230,8 +310,8 @@ private fun checkTopic(topic: Appearance.Topic, number: Int) {
         "Topic $number category must be a category key: a lowercase letter, then up to 49 lowercase letters, digits or _"
     }
     if (topic.icon.startsWith("data:"))
-        require(topic.icon.length <= IMAGE_MAX_LENGTH && IMAGE.matches(topic.icon)) {
-            "Topic $number icon must be a base64 PNG or JPEG data URL of at most $IMAGE_MAX_LENGTH characters"
+        require(validEmbeddedImage(topic.icon)) {
+            "Topic $number icon must be a PNG or JPEG data URL up to 2048 × 2048"
         }
     else
         require(topic.icon.length <= 32 && '<' !in topic.icon && '>' !in topic.icon) {

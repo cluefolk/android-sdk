@@ -7,8 +7,33 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Base64
 
 class AppearanceTest {
+    private fun png(
+        width: Int = 1,
+        height: Int = 1,
+        size: Int = 24,
+        chunkLength: Int = 13,
+        chunkType: String = "IHDR",
+    ): String {
+        val bytes = ByteArray(maxOf(size, 24))
+        byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a).copyInto(bytes)
+        fun putInt(offset: Int, value: Int) {
+            bytes[offset] = (value ushr 24).toByte()
+            bytes[offset + 1] = (value ushr 16).toByte()
+            bytes[offset + 2] = (value ushr 8).toByte()
+            bytes[offset + 3] = value.toByte()
+        }
+        putInt(8, chunkLength)
+        chunkType.toByteArray().copyInto(bytes, 12)
+        putInt(16, width)
+        putInt(20, height)
+        return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes)
+    }
+
+    private val tinyPNG = png()
+    private val tinyJPEG = "data:image/jpeg;base64,/9j/wAARCAABAAEDAREAAhEAAxEA/9k="
     private val custom = """
         {
           "version": 2,
@@ -21,7 +46,7 @@ class AppearanceTest {
           },
           "blocks": [
             {"type": "topics", "title": "Pick one", "text": "", "items": [
-              {"label": "Billing", "icon": "data:image/png;base64,iVBORw0KGgo=", "category": "billing_2"},
+              {"label": "Billing", "icon": "$tinyPNG", "category": "billing_2"},
               {"label": "Bugs\n", "icon": "\ud83d\udc1b", "category": "bug"}
             ]},
             {"type": "welcome", "title": "Hi", "text": "Line one\u2028line two", "items": []}
@@ -97,7 +122,7 @@ class AppearanceTest {
 
     @Test
     fun eachSetterChangesItsPart() {
-        val items = listOf(topic("Account", "account", "\uD83D\uDC64"), topic("Payments", "purchase", "data:image/jpeg;base64,/9j/4AAQ"))
+        val items = listOf(topic("Account", "account", "\uD83D\uDC64"), topic("Payments", "purchase", tinyJPEG))
         val built = Appearance.Builder()
             .title("Support")
             .mode(Appearance.Mode.LIGHT)
@@ -128,7 +153,7 @@ class AppearanceTest {
                 mapOf("type" to "welcome", "title" to "Hello", "text" to "We read everything", "items" to emptyList<Any>()),
                 mapOf("type" to "topics", "title" to "Topics", "text" to "", "items" to listOf(
                     mapOf("label" to "Account", "icon" to "\uD83D\uDC64", "category" to "account"),
-                    mapOf("label" to "Payments", "icon" to "data:image/jpeg;base64,/9j/4AAQ", "category" to "purchase"),
+                    mapOf("label" to "Payments", "icon" to tinyJPEG, "category" to "purchase"),
                 )),
                 mapOf("type" to "contact", "title" to "Write to us", "text" to "Usually within a day", "items" to emptyList<Any>()),
             ),
@@ -307,18 +332,28 @@ class AppearanceTest {
     @Test
     fun buildChecksImageIcons() {
         fun build(icon: String) = Appearance.Builder().topics("Topics", listOf(topic(icon = icon))).build()
-        build("data:image/png;base64,iVBORw0KGgo=")
-        build("data:image/jpeg;base64,/9j/4AAQSkZJRg==")
-        build("data:image/png;base64," + "A".repeat(700_040 - 22))
+        build(tinyPNG)
+        build(tinyJPEG)
+        build(png(size = 525_000))
         for (bad in listOf("data:image/gif;base64,R0lGOD", "data:image/png;base64,", "data:image/png;base64,abc def", "data:image/svg+xml;base64,PHN2Zz4=",
-            "data:image/png;base64,abc=d", "data:image/png,abc", "data:", "data:image/png;base64," + "A".repeat(700_040 - 21))) {
-            fails("Topic 1 icon must be a base64 PNG or JPEG data URL") { build(bad) }
+            "data:image/png;base64,abc=d", "data:image/png,abc", "data:", png(width = 16_384, height = 16_384), png(size = 525_001),
+            png(chunkLength = 12), png(chunkType = "IDAT"))) {
+            fails("Topic 1 icon must be") { build(bad) }
         }
     }
 
     @Test
+    fun jsonInputsAreBoundedBeforeParsing() {
+        fails("appearance JSON is larger") { Appearance.Builder(" ".repeat(1_500_001)) }
+        fails("appearance JSON is larger") { Appearance.Builder("é".repeat(750_001)) }
+        fails("appearance overrides JSON is larger") { Appearance.Builder().overrides(" ".repeat(1_500_001)) }
+        assertEquals("{}", boundedJSON("{}", 2, "too large"))
+        fails("attributes JSON is larger") { boundedJSON("\u00e9", 1, "The attributes JSON is larger than 15 KB") }
+    }
+
+    @Test
     fun buildRejectsAThemeOverTheWidgetLimit() {
-        val icon = "data:image/png;base64," + "A".repeat(600_000)
+        val icon = png(size = 390_000)
         Appearance.Builder().topics("Topics", List(2) { topic(icon = icon) }).build()
         fails("The appearance is larger than 1.5 MB") { Appearance.Builder().topics("Topics", List(3) { topic(icon = icon) }).build() }
     }

@@ -20,9 +20,70 @@ internal object BridgeMessages {
         val envelope = JSONObject(raw)
         require(envelope.keys().asSequence().toSet() == envelopeKeys &&
             envelope.getString("protocol") == BridgeProtocol.PROTOCOL && envelope.get("version") == BridgeProtocol.VERSION)
-        val id = envelope.getString("requestId")
-        require(id.length in 1..128)
-        return Request(id, envelope.getString("type"), envelope.getJSONObject("payload"))
+        val id = envelope.get("requestId") as? String
+        require(id != null && id.length in 1..128)
+        val type = envelope.get("type") as? String
+        val payload = envelope.get("payload") as? JSONObject
+        require(type != null && payload != null)
+        if (type in BridgeProtocol.NATIVE_REQUESTS) validatePayload(type, payload)
+        return Request(id, type, payload)
+    }
+
+    /** A correlation ID for a schema-error reply, when the malformed envelope still has one. */
+    fun requestId(raw: String): String? = runCatching {
+        (JSONObject(raw).opt("requestId") as? String)?.takeIf { it.length in 1..128 }
+    }.getOrNull()
+
+    private fun validatePayload(type: String, payload: JSONObject) {
+        val keys = payload.keys().asSequence().toSet()
+        fun exact(expected: Set<String>) = require(keys == expected)
+        fun string(name: String): String {
+            val value = payload.get(name) as? String
+            require(value != null && value.length in 1..128)
+            return value
+        }
+        fun nonNegativeInteger(name: String) {
+            val value = payload.get(name) as? Number
+            val number = value?.toDouble()
+            require(number != null && number.isFinite() && number >= 0 && number <= Int.MAX_VALUE && number % 1.0 == 0.0)
+        }
+        when (type) {
+            BridgeProtocol.NATIVE_READY, BridgeProtocol.NATIVE_AUTH_REQUIRED, BridgeProtocol.NATIVE_CLOSE -> exact(emptySet())
+            BridgeProtocol.NATIVE_UNREAD_COUNT_CHANGED -> {
+                exact(setOf("count"))
+                nonNegativeInteger("count")
+            }
+            BridgeProtocol.NATIVE_HISTORY_PAGE -> {
+                exact(setOf("syncId", "index"))
+                string("syncId")
+                nonNegativeInteger("index")
+            }
+            BridgeProtocol.NATIVE_CONVERSATION_CREATED -> {
+                exact(setOf("conversationId"))
+                string("conversationId")
+            }
+            BridgeProtocol.NATIVE_CONVERSATION_STATUS_CHANGED -> {
+                exact(setOf("conversationId", "status"))
+                string("conversationId")
+                val status = payload.get("status") as? String
+                require(status != null && status in setOf("open", "pending_agent", "pending_player", "resolved", "closed"))
+            }
+            BridgeProtocol.NATIVE_MESSAGE_SENT -> {
+                exact(setOf("conversationId", "messageId"))
+                string("conversationId")
+                string("messageId")
+            }
+            BridgeProtocol.NATIVE_DRAFT_GET -> {
+                exact(setOf("key"))
+                string("key")
+            }
+            BridgeProtocol.NATIVE_DRAFT_PUT -> {
+                exact(setOf("key", "content"))
+                string("key")
+                require(payload.get("content") is JSONObject || payload.get("content") == JSONObject.NULL)
+            }
+            BridgeProtocol.NATIVE_IMAGE_PUT, BridgeProtocol.NATIVE_IMAGE_GET -> image(type, payload)
+        }
     }
 
     fun reply(requestId: String, type: String, payload: JSONObject): String =

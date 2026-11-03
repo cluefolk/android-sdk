@@ -12,9 +12,21 @@ import java.util.UUID
  * anonymously; both provider requests and identityTokenRequired events are answered by C#.
  */
 object UnityBridge {
+    private const val IDENTITY_TIMEOUT_MS = 15_000L
+    private data class IdentityRequest(val callback: Cluefolk.IdentityCallback, val timeout: Runnable)
+
     private val main = Handler(Looper.getMainLooper())
     private var receiver = "CluefolkDispatcher"
-    private val identityRequests = HashMap<String, Cluefolk.IdentityCallback>()
+    private val identityRequests = HashMap<String, IdentityRequest>()
+
+    private fun clearIdentityRequests(error: String) {
+        val stale = identityRequests.values.toList()
+        identityRequests.clear()
+        stale.forEach {
+            main.removeCallbacks(it.timeout)
+            it.callback.complete(null, error)
+        }
+    }
 
     private fun player(): Class<*> = Class.forName("com.unity3d.player.UnityPlayer")
 
@@ -50,6 +62,7 @@ object UnityBridge {
         gameObject: String,
     ) {
         main.post {
+            clearIdentityRequests("ACCOUNT_CHANGED")
             receiver = gameObject
             try {
                 Cluefolk.setEventListener(object : Cluefolk.EventListener {
@@ -85,6 +98,7 @@ object UnityBridge {
     @JvmStatic
     fun login(token: String, requestId: String) {
         main.post {
+            clearIdentityRequests("ACCOUNT_CHANGED")
             Cluefolk.loginWithIdentity(token) { error -> send("completion", requestId, error) }
         }
     }
@@ -92,12 +106,17 @@ object UnityBridge {
     @JvmStatic
     fun setIdentityProvider(enabled: Boolean) {
         main.post {
-            identityRequests.clear()
+            clearIdentityRequests("IDENTITY_PROVIDER_CHANGED")
             Cluefolk.setIdentityTokenProvider(
                 if (!enabled) null
                 else Cluefolk.IdentityTokenProvider { callback ->
                     val requestId = UUID.randomUUID().toString()
-                    identityRequests[requestId] = callback
+                    val timeout = Runnable {
+                        val expired = identityRequests.remove(requestId) ?: return@Runnable
+                        expired.callback.complete(null, "IDENTITY_PROVIDER_TIMEOUT")
+                    }
+                    identityRequests[requestId] = IdentityRequest(callback, timeout)
+                    main.postDelayed(timeout, IDENTITY_TIMEOUT_MS)
                     send("identityTokenRequired", requestId)
                 },
             )
@@ -107,8 +126,11 @@ object UnityBridge {
     @JvmStatic
     fun completeIdentity(requestId: String, token: String, error: String) {
         main.post {
-            val callback = identityRequests.remove(requestId)
-            if (callback != null) callback.complete(token.ifEmpty { null }, error.ifEmpty { null })
+            val request = identityRequests.remove(requestId)
+            if (request != null) {
+                main.removeCallbacks(request.timeout)
+                request.callback.complete(token.ifEmpty { null }, error.ifEmpty { null })
+            }
             else Cluefolk.completeIdentityToken(requestId, token, error)
         }
     }
@@ -145,7 +167,10 @@ object UnityBridge {
 
     @JvmStatic
     fun logout() {
-        main.post { Cluefolk.logout() }
+        main.post {
+            clearIdentityRequests("ACCOUNT_CHANGED")
+            Cluefolk.logout()
+        }
     }
 
     /**
